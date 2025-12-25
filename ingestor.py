@@ -48,7 +48,7 @@ if __name__ == "__main__":
         doc.metadata.setdefault("service", "General")
 
     # initialise the ollama-supplied embedding model
-    embeddings = OllamaEmbeddings( model=EMBEDDING_MODEL,base_url=OLLAMA_BASE_URL )
+    embeddings = OllamaEmbeddings( model="nomic-embed-text:latest",base_url=OLLAMA_BASE_URL )
 
     # initialise the ChromaDB vector store with the embedded chunks
     vectorstore = Chroma.from_documents( documents=content_chunks,embedding=embeddings,persist_directory=PERSIST_DIR,collection_name=COLLECTION_NAME )
