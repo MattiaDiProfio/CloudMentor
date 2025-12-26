@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Loader2, Clock, Flag } from "lucide-react";
 
@@ -15,6 +15,8 @@ export default function Exam() {
   const [allAnswers, setAllAnswers] = useState({});
   const [answerRequirements, setAnswerRequirements] = useState({}); // Track num_correct for each question
   const [markedForReview, setMarkedForReview] = useState(new Set());
+  const [questionCache, setQuestionCache] = useState({});
+  const latestRequestedIndex = useRef(0);
   const [progress, setProgress] = useState({ generated_count: 0, total: 65 });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -53,6 +55,10 @@ export default function Exam() {
     if (progress.generated_count > currentQuestionIndex) {
       loadQuestion(currentQuestionIndex);
     }
+    // Try prefetching next question if available
+    if (progress.generated_count > currentQuestionIndex + 1) {
+      prefetchQuestion(currentQuestionIndex + 1);
+    }
   }, [currentQuestionIndex, progress]);
 
   // Auto-load first question as soon as it's available
@@ -77,6 +83,25 @@ export default function Exam() {
   };
 
   const loadQuestion = async (index) => {
+    // Remember the most recent index request so we can ignore stale responses
+    latestRequestedIndex.current = index;
+
+    // If cached, use immediately
+    if (questionCache[index]) {
+      const data = questionCache[index];
+      if (latestRequestedIndex.current === index) {
+        setCurrentQuestion(data);
+        setSelectedAnswers(allAnswers[index] || []);
+        setAnswerRequirements((prev) => ({
+          ...prev,
+          [index]: data.num_correct,
+        }));
+      }
+      // Prefetch next
+      prefetchQuestion(index + 1);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch(
@@ -84,19 +109,42 @@ export default function Exam() {
       );
       if (response.ok) {
         const data = await response.json();
-        setCurrentQuestion(data);
-        // Load previously selected answers for this question
-        setSelectedAnswers(allAnswers[index] || []);
-        // Store the requirement for this question
-        setAnswerRequirements((prev) => ({
-          ...prev,
-          [index]: data.num_correct,
-        }));
+        // cache it
+        setQuestionCache((p) => ({ ...p, [index]: data }));
+
+        // Only apply to current view if still relevant
+        if (latestRequestedIndex.current === index) {
+          setCurrentQuestion(data);
+          setSelectedAnswers(allAnswers[index] || []);
+          setAnswerRequirements((prev) => ({
+            ...prev,
+            [index]: data.num_correct,
+          }));
+        }
+
+        // Prefetch next question
+        prefetchQuestion(index + 1);
       }
     } catch (error) {
       console.error("Error loading question:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const prefetchQuestion = async (index) => {
+    if (index < 0 || index >= progress.generated_count) return;
+    if (questionCache[index]) return;
+    try {
+      const response = await fetch(
+        `${API_URL}/api/exam/${examId}/question/${index}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setQuestionCache((p) => ({ ...p, [index]: data }));
+      }
+    } catch (e) {
+      // ignore prefetch errors
     }
   };
 
@@ -141,23 +189,32 @@ export default function Exam() {
     }
   };
 
-  const goToQuestion = async (index) => {
+  const goToQuestion = (index) => {
     if (index >= progress.generated_count) return;
-    await saveAnswer();
+    // Save in background and navigate immediately for snappy UX
+    saveAnswer().catch((e) => console.error("Save failed:", e));
+    latestRequestedIndex.current = index;
     setCurrentQuestionIndex(index);
+    loadQuestion(index);
   };
 
-  const goToNextQuestion = async () => {
-    await saveAnswer();
+  const goToNextQuestion = () => {
+    saveAnswer().catch((e) => console.error("Save failed:", e));
     if (currentQuestionIndex < progress.total - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      const next = currentQuestionIndex + 1;
+      latestRequestedIndex.current = next;
+      setCurrentQuestionIndex(next);
+      loadQuestion(next);
     }
   };
 
-  const goToPreviousQuestion = async () => {
-    await saveAnswer();
+  const goToPreviousQuestion = () => {
+    saveAnswer().catch((e) => console.error("Save failed:", e));
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      const prev = currentQuestionIndex - 1;
+      latestRequestedIndex.current = prev;
+      setCurrentQuestionIndex(prev);
+      loadQuestion(prev);
     }
   };
 

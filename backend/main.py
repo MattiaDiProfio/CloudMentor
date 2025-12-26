@@ -65,7 +65,7 @@ def classify_question_domain(question_text: str, options: Dict[str, str]) -> str
     return "General"
 
 
-async def generate_questions_background(exam_id: str, num_questions: int = 65):
+async def generate_questions_background(exam_id: str, num_questions: int = 3):
     """Generate questions in the background"""
     try:
         questions = []
@@ -272,14 +272,14 @@ async def start_exam(background_tasks: BackgroundTasks):
     question_cache[exam_id] = {
         "questions": [],
         "generated_count": 0,
-        "total": 65,
+        "total": 3,
         "completed": False,
         "user_answers": {},
         "start_time": datetime.now(),
         "cancelled": False
     }
     
-    background_tasks.add_task(generate_questions_background, exam_id, 65)
+    background_tasks.add_task(generate_questions_background, exam_id, 3)
     
     return {"exam_id": exam_id, "status": "generating"}
 
