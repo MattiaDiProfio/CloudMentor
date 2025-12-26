@@ -11,8 +11,8 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharac
 from langchain_ollama import OllamaEmbeddings
 from langchain_community.vectorstores import Chroma
 
-NOTES_PATH = Path("notes/AWS DVA-C02 Notes.md")
-PERSIST_DIR = "vectorstore"
+NOTES_PATH = Path("../notes/AWS DVA-C02 Notes.md")
+PERSIST_DIR = "../vectorstore"
 COLLECTION_NAME = "aws_dva_c02_notes"
 OLLAMA_BASE_URL = "http://localhost:11434"
 EMBEDDING_MODEL = "nomic-embed-text:latest"

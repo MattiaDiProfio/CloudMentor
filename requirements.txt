@@ -1,8 +1,0 @@
-langchain
-langchain-chroma
-langchain-community
-chromadb
-requests
-pydantic
-langchain-openai 
-python-dotenv
